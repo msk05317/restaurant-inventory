@@ -1,4 +1,5 @@
 import { firebaseConfig } from "./firebase-config.js";
+import { GLOSSARY } from "./glossary.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -74,21 +75,34 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 
 /* ---------- 번역 ---------- */
 const transCache = new Map();
+const GLOSS_KO = new Map(), GLOSS_VI = new Map();
+for (const [ko, vi] of Object.entries(GLOSSARY)) { GLOSS_KO.set(norm(ko), vi); if (!GLOSS_VI.has(norm(vi))) GLOSS_VI.set(norm(vi), ko); }
+// 식재료 문맥을 붙여 번역한 뒤 괄호 부분을 떼어냄 (예: "가오리 (식재료)" → "Cá đuối (nguyên liệu)" → "Cá đuối")
+const CONTEXT = { ko: "식재료", vi: "nguyên liệu nấu ăn" };
+const stripCtx = s => String(s || "").replace(/\s*[(（][^()（）]*[)）]\s*$/, "").trim();
+const capFirst = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+async function rawTranslate(q, from, to) {
+  try {
+    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(q)}`);
+    if (r.ok) { const j = await r.json(); const out = (j[0] || []).map(x => x[0]).join("").trim(); if (out) return out; }
+  } catch (e) {}
+  try {
+    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(q)}&langpair=${from}|${to}`);
+    const j = await r.json();
+    if (j.responseStatus === 200 && j.responseData && j.responseData.translatedText) return j.responseData.translatedText.trim();
+  } catch (e) {}
+  return null;
+}
 async function translate(text, from, to) {
+  const g = (from === "ko" ? GLOSS_KO : GLOSS_VI).get(norm(text));
+  if (g) return g;
   const key = `${from}>${to}:${norm(text)}`;
   if (transCache.has(key)) return transCache.get(key);
   let out = null;
-  try {
-    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`);
-    if (r.ok) { const j = await r.json(); out = (j[0] || []).map(x => x[0]).join("").trim() || null; }
-  } catch (e) {}
-  if (!out) {
-    try {
-      const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`);
-      const j = await r.json();
-      if (j.responseStatus === 200 && j.responseData && j.responseData.translatedText) out = j.responseData.translatedText.trim();
-    } catch (e) {}
-  }
+  const withCtx = await rawTranslate(`${text} (${CONTEXT[from]})`, from, to);
+  if (withCtx && /[)）]\s*$/.test(withCtx)) out = stripCtx(withCtx);
+  if (!out) out = await rawTranslate(text, from, to); // 괄호가 사라졌으면 문맥 없이 다시 번역
+  if (out && to === "vi") out = capFirst(out);
   if (out) transCache.set(key, out);
   return out;
 }

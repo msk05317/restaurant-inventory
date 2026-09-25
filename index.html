@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1D2A2F">
+<title>식당 재고 관리</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 data-t="title"></h1>
+    <div class="lang" role="group" aria-label="Language">
+      <button id="lang-ko" aria-pressed="true">KR</button>
+      <button id="lang-vi" aria-pressed="false">VIET</button>
+    </div>
+  </header>
+
+  <p class="status" id="status"></p>
+  <div class="admin" id="adminBar"><span data-t="adminOn"></span><button id="adminOff" data-t="adminOffBtn"></button></div>
+
+  <div class="datebar">
+    <button id="prev" aria-label="prev">‹</button>
+    <input type="date" id="viewDate">
+    <button id="next" aria-label="next">›</button>
+    <button class="today" id="todayBtn" data-t="today"></button>
+  </div>
+
+  <input class="search" id="search" type="search" data-tp="searchPh">
+
+  <div class="summary"><span id="count"></span><span data-t="lockedNote"></span></div>
+  <div id="list"></div>
+
+  <button class="settings" id="settingsBtn" data-t="pwChange"></button>
+</div>
+
+<button class="fab" id="addBtn" data-t="add" disabled></button>
+
+<!-- entry sheet -->
+<div class="overlay" id="entryOv">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="entryTitle"></h2>
+    <p class="hint" id="entryHint"></p>
+    <label class="f"><span id="nameMainLabel"></span><input id="fNameMain" list="namesMain" autocomplete="off"></label>
+    <datalist id="namesMain"></datalist>
+    <label class="f small"><span id="nameSubLabel"></span><input id="fNameSub" list="namesSub" autocomplete="off"></label>
+    <datalist id="namesSub"></datalist>
+    <div class="trans" id="transNote"></div>
+    <label class="f"><span data-t="date"></span><input id="fDate" type="date"></label>
+    <div class="row3">
+      <label class="f"><span data-t="qty"></span><input id="fQty" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label class="f in"><span data-t="in"></span><input id="fIn" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label class="f out"><span data-t="out"></span><input id="fOut" type="number" inputmode="decimal" min="0" step="any"></label>
+    </div>
+    <div class="preview"><div><span data-t="stock"></span><small data-t="formula"></small></div><b id="fStock">0</b></div>
+    <label class="f"><span data-t="note"></span><textarea id="fNote"></textarea></label>
+    <p class="err" id="entryErr"></p>
+    <div class="actions"><button id="entryCancel" data-t="cancel"></button><button class="primary" id="entrySave" data-t="save"></button></div>
+  </div>
+</div>
+
+<!-- password sheet -->
+<div class="overlay" id="pwOv">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="pwTitle"></h2>
+    <p class="hint" id="pwHint"></p>
+    <div class="seg" id="pwWhich" role="group">
+      <button id="whichAdmin" aria-pressed="true" data-t="pwAdmin"></button>
+      <button id="whichServer" aria-pressed="false" data-t="pwServer"></button>
+    </div>
+    <label class="f" id="pwCurWrap"><span id="pwCurLabel"></span><input id="pwCur" type="password" autocomplete="current-password"></label>
+    <label class="f" id="pwNewWrap"><span id="pwNewLabel"></span><input id="pwNew" type="password" autocomplete="new-password"></label>
+    <label class="f" id="pwNew2Wrap"><span id="pwNew2Label"></span><input id="pwNew2" type="password" autocomplete="new-password"></label>
+    <p class="err" id="pwErr"></p>
+    <div class="actions"><button id="pwCancel" data-t="cancel"></button><button class="primary" id="pwOk" data-t="confirm"></button></div>
+  </div>
+</div>
+
+<!-- delete confirm -->
+<div class="overlay" id="delOv">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 data-t="delQ"></h2>
+    <p class="hint" id="delName"></p>
+    <div class="actions"><button id="delCancel" data-t="cancel"></button><button class="danger" id="delOk" data-t="del"></button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

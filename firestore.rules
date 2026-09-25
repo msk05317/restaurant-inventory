@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function validEntry(d) {
+      return d.keys().hasAll(['date','pid','ko','vi','qty','inn','out'])
+        && d.date is string && d.date.size() == 10
+        && d.ko is string && d.ko.size() <= 100
+        && d.vi is string && d.vi.size() <= 100
+        && d.qty is number && d.qty >= 0
+        && d.inn is number && d.inn >= 0
+        && d.out is number && d.out >= 0;
+    }
+
+    match /entries/{id} {
+      allow read, delete: if true;
+      allow create, update: if validEntry(request.resource.data);
+    }
+    match /products/{pid} {
+      allow read, write: if true;
+    }
+    match /settings/lock {
+      allow read, write: if true;
+    }
+  }
+}

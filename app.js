@@ -326,7 +326,9 @@ async function onNameEntered(which) {
   if (pid) {
     const p = products[pid];
     const srcLang = norm(p.ko) === norm(text) ? "ko" : "vi";
-    dstEl.value = p[other(srcLang)] || dstEl.value;
+    // 사전에 있는 단어면 사전 번역을 우선 (예전에 잘못 저장된 번역을 바로잡음)
+    const g = (srcLang === "ko" ? GLOSS_KO : GLOSS_VI).get(norm(text));
+    dstEl.value = g || p[other(srcLang)] || dstEl.value;
     if (editing && pid !== editing.pid) { /* 수정 중엔 다른 상품으로 바꾸지 않음 */ }
     else { pickedPid = pid; setTransNote("known"); tryAutoQty(); }
     return;
@@ -372,6 +374,10 @@ $("entrySave").onclick = async () => {
     if (!pid) {
       pid = newId();
       await setDoc(doc(db, "products", pid), { ko: names.ko, vi: names.vi, createdAt: Date.now() });
+    } else if (!editing) {
+      // 등록된 상품인데 이름이 바뀌었으면(번역 수정 등) 상품 사전도 함께 고침
+      const p = products[pid];
+      if (p && (p.ko !== names.ko || p.vi !== names.vi)) await updateDoc(doc(db, "products", pid), names);
     }
 
     if (editing) {

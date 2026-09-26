@@ -27,7 +27,9 @@ const T = {
     adminOn: "🔓 관리자 모드 — 수정·삭제 가능", adminOffBtn: "잠그기",
     connecting: "연결 중…", setup: "firebase-config.js 설정이 아직 안 됐어요. README의 설정 순서를 따라 주세요.",
     offline: "서버에 연결할 수 없어요. 인터넷 연결을 확인하세요.", denied: "권한이 없어 저장하지 못했어요.",
-    fail: "저장하지 못했어요. 잠시 후 다시 시도하세요.", prevStock: v => `직전 재고 ${v} 자동 입력`
+    fail: "저장하지 못했어요. 잠시 후 다시 시도하세요.", prevStock: v => `직전 재고 ${v} 자동 입력`,
+    tabOverview: "재고 현황", tabManage: "재고 관리", ovTitle: n => `식재료 ${n}개 · 최신 재고`, ovEmpty: "아직 기록된 식재료가 없어요. 재고 관리 탭에서 ＋ 새 기록으로 추가하세요.",
+    lastRec: (d, sub) => `${sub ? sub + " · " : ""}마지막 기록 ${d}`, pickHint: "pill을 누르면 그 기록이 선택돼요. 수정·삭제는 선택한 기록에 적용돼요.", times: n => `${n}회`
   },
   vi: {
     title: "Quản lý kho nhà hàng", today: "Hôm nay", searchPh: "Tìm tên hàng", lockedNote: "🔒 Mục đã lưu bị khóa", add: "＋ Thêm mục",
@@ -51,7 +53,9 @@ const T = {
     adminOn: "🔓 Chế độ quản lý — có thể sửa/xóa", adminOffBtn: "Khóa lại",
     connecting: "Đang kết nối…", setup: "Chưa cấu hình firebase-config.js. Xem hướng dẫn trong README.",
     offline: "Không kết nối được máy chủ. Kiểm tra mạng.", denied: "Không có quyền nên không lưu được.",
-    fail: "Không lưu được. Vui lòng thử lại sau.", prevStock: v => `Tự điền tồn kho trước: ${v}`
+    fail: "Không lưu được. Vui lòng thử lại sau.", prevStock: v => `Tự điền tồn kho trước: ${v}`,
+    tabOverview: "Tồn kho", tabManage: "Nhập / Xuất", ovTitle: n => `${n} nguyên liệu · tồn kho mới nhất`, ovEmpty: "Chưa có nguyên liệu nào. Vào tab Nhập / Xuất và bấm ＋ Thêm mục.",
+    lastRec: (d, sub) => `${sub ? sub + " · " : ""}Ghi lần cuối ${d}`, pickHint: "Bấm vào ô để chọn lần ghi đó. Sửa/Xóa sẽ áp dụng cho lần ghi đã chọn.", times: n => `${n} lần`
   }
 };
 
@@ -160,31 +164,85 @@ function updateStatus() {
 }
 function toast(msg) { const el = $("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove("show"), 2000); }
 
+let tab = "overview"; try { const v = localStorage.getItem("inv-tab"); if (v === "manage" || v === "overview") tab = v; } catch (e) {}
+const selected = {}; // 상품별로 선택된 기록 id
+const fmtShort = d => { const [, m, dd] = d.split("-"); return `${Number(m)}/${Number(dd)}`; };
+const byTime = (a, b) => a.date === b.date ? (a.createdAt || 0) - (b.createdAt || 0) : a.date < b.date ? -1 : 1;
+const hm = ms => { if (!ms) return ""; const d = new Date(ms); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+const matches = (e, q) => !q || norm(nameOf(e, "ko")).includes(q) || norm(nameOf(e, "vi")).includes(q);
+
 function render() {
   const q = norm($("search").value);
-  const list = Object.entries(entries).map(([id, e]) => ({ ...e, id }))
-    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
-    .filter(e => !q || norm(nameOf(e, "ko")).includes(q) || norm(nameOf(e, "vi")).includes(q));
-  $("count").textContent = t("count")(list.length);
-  $("list").innerHTML = !list.length
+  const all = Object.entries({ ...recent, ...entries }).map(([id, e]) => ({ ...e, id }));
+
+  /* 탭 표시 */
+  ["overview", "manage"].forEach(k => {
+    $("panel-" + k).classList.toggle("on", tab === k);
+    $(k === "overview" ? "tabOv" : "tabMg").setAttribute("aria-selected", tab === k);
+  });
+
+  /* 재고 현황: 상품별 가장 최근 기록의 재고 */
+  const latest = {};
+  all.sort(byTime).forEach(e => { latest[e.pid] = e; });
+  const ov = Object.values(latest).sort((a, b) => nameOf(a).localeCompare(nameOf(b), lang));
+  $("ovTitle").textContent = t("ovTitle")(ov.length);
+  const ovShown = ov.filter(e => matches(e, q));
+  $("ovList").innerHTML = ovShown.length
+    ? ovShown.map(e => { const v = stockOf(e), sub = nameOf(e, other(lang));
+        return `<button class="ov-item${v < 0 ? " neg" : ""}" data-name="${esc(nameOf(e))}" data-date="${esc(e.date)}">
+          <div class="ov-name"><b>${esc(nameOf(e))}</b><small>${esc(t("lastRec")(fmtShort(e.date), norm(sub) !== norm(nameOf(e)) ? sub : ""))}</small></div>
+          <div class="ov-num"><b>${show(v)}</b><span>${esc(t("stock"))}</span></div>
+          <span class="ov-arrow">›</span></button>`; }).join("")
+    : `<div class="empty">${esc(q ? t("noMatch") : t("ovEmpty"))}</div>`;
+
+  /* 선택 날짜 기록: 같은 상품은 한 카드로 묶고 pill만 추가 */
+  const day = Object.entries(entries).map(([id, e]) => ({ ...e, id })).sort(byTime).filter(e => matches(e, q));
+  const groups = [];
+  const idx = {};
+  day.forEach(e => { const k = e.pid || e.id; if (!(k in idx)) { idx[k] = groups.length; groups.push({ pid: k, items: [] }); } groups[idx[k]].items.push(e); });
+  $("count").textContent = t("count")(groups.length);
+
+  $("list").innerHTML = !groups.length
     ? `<div class="empty">${esc(q ? t("noMatch") : t("empty"))}</div>`
-    : list.map(e => {
-        const tm = e.createdAt ? new Date(e.createdAt) : null;
-        const main = nameOf(e, lang), sub = nameOf(e, other(lang));
+    : groups.map(g => {
+        const items = g.items, first = items[0], last = items[items.length - 1];
+        if (!items.some(e => e.id === selected[g.pid])) selected[g.pid] = last.id;
+        const sel = items.find(e => e.id === selected[g.pid]);
+        const main = nameOf(first, lang), sub = nameOf(first, other(lang));
+        const pills = [];
+        items.forEach((e, i) => {
+          const cls = items.length > 1 && e.id === sel.id ? " sel" : "";
+          const prev = i > 0 ? stockOf(items[i - 1]) : null;
+          const showQty = i === 0 || num(e.qty) !== prev || (num(e.inn) === 0 && num(e.out) === 0);
+          if (showQty) pills.push(`<button class="chip${cls}" data-pick="${esc(e.id)}" data-pid="${esc(g.pid)}">${esc(t("qty"))} ${show(num(e.qty))}</button>`);
+          if (num(e.inn) > 0) pills.push(`<button class="chip in${cls}" data-pick="${esc(e.id)}" data-pid="${esc(g.pid)}">${esc(t("in"))} +${show(num(e.inn))}</button>`);
+          if (num(e.out) > 0) pills.push(`<button class="chip out${cls}" data-pick="${esc(e.id)}" data-pid="${esc(g.pid)}">${esc(t("out"))} −${show(num(e.out))}</button>`);
+        });
+        const notes = items.filter(e => e.note).map(e => `${items.length > 1 ? hm(e.createdAt) + " " : ""}${esc(e.note)}`);
         return `<article class="ticket">
           <div class="t-top"><div class="t-name">${esc(main)}${sub && norm(sub) !== norm(main) ? `<div class="t-sub">${esc(sub)}</div>` : ""}</div>
-            <div class="t-stock"><b>${show(stockOf(e))}</b><span>${esc(t("stock"))}</span></div></div>
-          <div class="t-flow"><span class="chip">${esc(t("qty"))} ${show(num(e.qty))}</span>
-            <span class="chip in">${esc(t("in"))} +${show(num(e.inn))}</span>
-            <span class="chip out">${esc(t("out"))} −${show(num(e.out))}</span></div>
-          ${e.note ? `<div class="t-note">${esc(e.note)}</div>` : ""}
-          <div class="t-foot"><span class="lockbadge">🔒 ${tm ? pad(tm.getHours()) + ":" + pad(tm.getMinutes()) : ""}</span>
-            ${e.edited ? `<span class="edited">${esc(t("edited"))}</span>` : ""}<span class="spacer"></span>
-            <button data-edit="${esc(e.id)}">${esc(t("edit"))}</button>
-            <button class="del" data-del="${esc(e.id)}">${esc(t("del"))}</button></div>
+            <div class="t-stock"><b>${show(stockOf(last))}</b><span>${esc(t("stock"))}</span></div></div>
+          <div class="t-flow">${pills.join("")}</div>
+          ${items.length > 1 ? `<div class="t-hint">${esc(t("pickHint"))}</div>` : ""}
+          ${notes.length ? `<div class="t-note">${notes.join("<br>")}</div>` : ""}
+          <div class="t-foot"><span class="lockbadge">🔒 ${hm(sel.createdAt)}${items.length > 1 ? ` · ${esc(t("times")(items.length))}` : ""}</span>
+            ${sel.edited ? `<span class="edited">${esc(t("edited"))}</span>` : ""}<span class="spacer"></span>
+            <button data-edit="${esc(sel.id)}">${esc(t("edit"))}</button>
+            <button class="del" data-del="${esc(sel.id)}">${esc(t("del"))}</button></div>
         </article>`;
       }).join("");
 }
+function setTab(k) { tab = k; try { localStorage.setItem("inv-tab", k); } catch (e) {} render(); window.scrollTo(0, 0); }
+$("tabOv").onclick = () => setTab("overview");
+$("tabMg").onclick = () => setTab("manage");
+/* 재고 현황에서 식재료를 누르면: 재고 관리 탭으로 이동, 마지막 기록 날짜 + 그 식재료만 */
+$("ovList").onclick = ev => {
+  const b = ev.target.closest(".ov-item"); if (!b) return;
+  $("search").value = b.dataset.name;
+  tab = "manage"; try { localStorage.setItem("inv-tab", "manage"); } catch (e) {}
+  if (b.dataset.date !== viewDate) goDate(b.dataset.date); else render();
+  window.scrollTo(0, 0);
+};
 function fillDatalists(mainLang) {
   const names = l => [...new Set(Object.values(products).map(p => (p[l] || "").trim()).filter(Boolean))].sort();
   $("namesMain").innerHTML = names(mainLang).map(n => `<option value="${esc(n)}">`).join("");
@@ -400,6 +458,7 @@ $("entrySave").onclick = async () => {
 let pendingDel = null;
 $("list").onclick = async ev => {
   const b = ev.target.closest("button"); if (!b || !ready) return;
+  if (b.dataset.pick) { selected[b.dataset.pid] = b.dataset.pick; render(); return; }
   const id = b.dataset.edit || b.dataset.del; const e = entries[id]; if (!e) return;
   if (!(await requireAdmin())) return;
   if (b.dataset.edit) openEntry({ ...e, id });
@@ -438,7 +497,7 @@ function subscribeAll() {
   }, () => {});
   // 직전 재고 자동 입력용: 최근 120일 기록
   unsubRecent = onSnapshot(query(collection(db, "entries"), where("date", ">=", shift(todayStr(), -120))), snap => {
-    const next = {}; snap.forEach(d => { next[d.id] = d.data(); }); recent = next;
+    const next = {}; snap.forEach(d => { next[d.id] = d.data(); }); recent = next; render();
   }, () => {});
   subscribeDate();
 }

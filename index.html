@@ -24,17 +24,30 @@
   <p class="status" id="status"></p>
   <div class="admin" id="adminBar"><span data-t="adminOn"></span><button id="adminOff" data-t="adminOffBtn"></button></div>
 
-  <div class="datebar">
-    <button id="prev" aria-label="prev">‹</button>
-    <input type="date" id="viewDate">
-    <button id="next" aria-label="next">›</button>
-    <button class="today" id="todayBtn" data-t="today"></button>
-  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tabOv" data-tab="overview" data-t="tabOverview"></button>
+    <button role="tab" id="tabMg" data-tab="manage" data-t="tabManage"></button>
+  </nav>
 
   <input class="search" id="search" type="search" data-tp="searchPh">
 
-  <div class="summary"><span id="count"></span><span data-t="lockedNote"></span></div>
-  <div id="list"></div>
+  <!-- 탭 1: 재고 현황 -->
+  <section class="panel" id="panel-overview">
+    <div class="summary"><span id="ovTitle"></span></div>
+    <div class="ov-list" id="ovList"></div>
+  </section>
+
+  <!-- 탭 2: 재고 관리 -->
+  <section class="panel" id="panel-manage">
+    <div class="datebar">
+      <button id="prev" aria-label="prev">‹</button>
+      <input type="date" id="viewDate">
+      <button id="next" aria-label="next">›</button>
+      <button class="today" id="todayBtn" data-t="today"></button>
+    </div>
+    <div class="summary"><span id="count"></span><span data-t="lockedNote"></span></div>
+    <div id="list"></div>
+  </section>
 
   <button class="settings" id="settingsBtn" data-t="pwChange"></button>
 </div>
